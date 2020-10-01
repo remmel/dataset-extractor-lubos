@@ -39,6 +39,6 @@
   printf(__VA_ARGS__); printf("\n")
 #endif
 
-enum Pose { COLOR_CAMERA, DEPTH_CAMERA, OPENGL_CAMERA, SCREEN_CAMERA, MAX_CAMERA };
+enum Pose { COLOR_CAMERA, OPENGL_CAMERA, SCREEN_CAMERA, MAX_CAMERA };
 
 #endif

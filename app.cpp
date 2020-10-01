@@ -43,7 +43,7 @@ void convertFrame(std::string dataset, int poseIndex)
     fclose(file);
 
     //get matrices and captured photo
-    glm::mat4 depth_mat = getPose(getFilename(dataset, poseIndex, "mat"), DEPTH_CAMERA);
+    glm::mat4 depth_mat = getPose(getFilename(dataset, poseIndex, "mat"), COLOR_CAMERA);
     glm::mat4 viewproj_mat = getPose(getFilename(dataset, poseIndex, "mat"), SCREEN_CAMERA);
     oc::Image* jpg = new oc::Image(getFilename(dataset, poseIndex, "jpg"));
 

@@ -65,7 +65,7 @@ glm::mat4 getPose(std::string filename, int pose)
     return mat;
 }
 
-void convertFrame(std::string dataset, int poseIndex)
+void writePly(std::string dataset, int poseIndex)
 {
     //get point cloud
     int size = 0;
@@ -104,7 +104,25 @@ void convertFrame(std::string dataset, int poseIndex)
     oc::File3d(getFilename(dataset, poseIndex, "ply"), true).WriteModel(output);
 }
 
-void exportDepthmap(std::string dataset, int poseIndex)
+void fillDepthHole(unsigned short data[], bool valid[], int width, int height, int x, int y, unsigned short depth) {
+    for (int k = x - 1; k <= x + 1; k++)
+    {
+        for (int l = y - 1; l <= y + 1; l++)
+        {
+            if ((k < 0) || (l < 0) || (k >= width) || (l >= height))
+                continue;
+            if (!valid[l * width + k])
+            {
+                data[l * width + k] = depth;
+                if ((x == k) && (y == l))
+                    valid[l * width + k] = true;
+            }
+        }
+    }
+}
+
+//TODO get the fx,fy,cx,cy
+void writeDepth16Png(std::string dataset, int poseIndex)
 {
     //get point cloud
     int size = 0;
@@ -117,12 +135,16 @@ void exportDepthmap(std::string dataset, int poseIndex)
     fclose(file);
 
     //get matrices
-    glm::mat4 depth_mat = getPose(getFilename(dataset, poseIndex, "mat"), COLOR_CAMERA);
+    glm::mat4 pose = getPose(getFilename(dataset, poseIndex, "mat"), COLOR_CAMERA);
     glm::mat4 viewproj_mat = getPose(getFilename(dataset, poseIndex, "mat"), SCREEN_CAMERA);
 
     //init variables
     int width = 180;
     int height = 320; //180/9*16 (resize 4:3 to 16:9)
+//    int cx = width / 2;
+//    int cy = height / 2;
+//    float fx = 271.368;
+//    float fy = 239;
     unsigned short data[width * height];
     bool valid[width * height];
     for (unsigned int i = 0; i < width * height; i++)
@@ -135,29 +157,23 @@ void exportDepthmap(std::string dataset, int poseIndex)
     bool fillHoles = true;
     for (unsigned int i = 0; i < size; i++)
     {
-        glm::vec4 v = depth_mat * glm::vec4(points[i][0], points[i][1], points[i][2], 1.0f);
-        glm::vec4 t = viewproj_mat * glm::vec4(v.x, v.y, v.z, 1.0f);
+        glm::vec4 p = glm::vec4(points[i][0], points[i][1], points[i][2], 1.0f); //point in local coordinate
+        glm::vec4 worldp = pose * p; //point in world coordinate
+        glm::vec4 t = viewproj_mat * glm::vec4(worldp.x, worldp.y, worldp.z, 1.0f);
         t /= fabs(t.w);
         t = t * 0.5f + 0.5f;
         int x = (int)(t.x * width + 0.5f);
         int y = (int)((1.0f - t.y) * height + 0.5f);
-        unsigned short depth = fabs(v.y) * 1000;//mm
+
+//        float fx_calculated = (x-cx)/p.x*p.z;
+//        float fy_calculated = (y-cy)/p.y*p.z;
+//        float x2 = (p.x*fx)/p.z + cx;
+//        float y2 = (p.y*fy)/p.z + cy;
+
+        unsigned short depth = fabs(p.z) * 5000; //1m <=> 5000
         if (fillHoles)
         {
-            for (int k = x - 1; k <= x + 1; k++)
-            {
-                for (int l = y - 1; l <= y + 1; l++)
-                {
-                    if ((k < 0) || (l < 0) || (k >= width) || (l >= height))
-                        continue;
-                    if (!valid[l * width + k])
-                    {
-                        data[l * width + k] = depth;
-                        if ((x == k) && (y == l))
-                            valid[l * width + k] = true;
-                    }
-                }
-            }
+            fillDepthHole(data, valid, width, height, x, y, depth);
         }
         else
         {
@@ -193,8 +209,8 @@ int main(int argc, char** argv)
     //convert each frame
     for (int i = 0; i < poseCount; i++)
     {
-        convertFrame(dataset, i);
-        exportDepthmap(dataset, i);
+        writePly(dataset, i);
+        writeDepth16Png(dataset, i);
     }
 
     //merge all frames together
